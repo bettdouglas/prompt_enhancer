@@ -9,6 +9,7 @@ function App() {
   const [prompt, setPrompt] = useState('');
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [enhancedPrompt, setEnhancedPrompt] = useState('');
+  const [thingsImproved, setThingsImproved] = useState<string[]>([]);
 
   const handleToggleOption = (id: string) => {
     setSelectedOptions((prev) =>
@@ -18,7 +19,8 @@ function App() {
 
   const handleEnhancePrompt = async () => {
     const result = await enhancePrompt(prompt, selectedOptions);
-    setEnhancedPrompt(result);
+    setEnhancedPrompt(result.enhancePrompt);
+    setThingsImproved(result.thingsImprovedInPrompt);
   };
 
   return (
@@ -36,11 +38,9 @@ function App() {
               selectedOptions={selectedOptions}
               onToggleOption={handleToggleOption}
             />
-            {enhancedPrompt && <ResultDisplay enhancedPrompt={enhancedPrompt} />}
+            {enhancedPrompt && <ResultDisplay enhancedPrompt={enhancedPrompt} thingsImproved={thingsImproved} />}
           </div>
-          {/* <div className="lg:col-span-1">
-            <ContextLibrary />
-          </div> */}
+          
         </div>
       </main>
     </div>

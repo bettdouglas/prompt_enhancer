@@ -1,6 +1,5 @@
 import Cerebras from '@cerebras/cerebras_cloud_sdk';
 
-
 const apiKey = import.meta.env.VITE_CEREBRAS_API_KEY;
 
 const client = new Cerebras({
@@ -9,14 +8,18 @@ const client = new Cerebras({
   timeout: 60 * 1000,
 });
 
-// const systemPrompt =stripIndents;
+interface EnhancedPromptResponse {
+  enhancePrompt: string;
+  thingsImprovedInPrompt: string[];
+}
 
-export async function enhancePrompt(prompt: string, options: string[]): Promise<string> {
+export async function enhancePrompt(prompt: string, options: string[]): Promise<EnhancedPromptResponse> {
   try {
     const params: Cerebras.Chat.ChatCompletionCreateParams = {
       messages: [
         {
-          role: 'system', content: `
+          role: 'system',
+          content: `
 You are a professional prompt engineer specializing in crafting precise, effective prompts.
 Your task is to enhance prompts by making them more specific, actionable, and effective.
 
@@ -43,25 +46,69 @@ Do not include any explanations, metadata, or wrapper tags.
 <original_prompt>
 ${prompt}
 </original_prompt>
-`},
-        { role: 'user', content: `Enhance the prompt ensuring it is ${options.join(' ,')}` },],
-      model: 'llama3.1-8b',
+
+Respond with the following JSON SCHEMA:
+{{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Prompt Enhancer System",
+  "description": "A system for enhancing and tracking improvements in user prompts.",
+  "type": "object",
+  "properties": {{
+    "enhancePrompt": {{
+      "description": "The original prompt to be enhanced.",
+      "type": "string"
+        }},
+    "thingsImprovedInPrompt": {{
+      "description": "A list of improvements made to the original prompt.",
+      "type": "array",
+      "items": {{
+        "type": "string"
+        }}
+        }}
+        }},
+  "required": ["enhancePrompt", "thingsImprovedInPrompt"]
+        }}
+`
+        },
+        { role: 'user', content: `Enhance the prompt ensuring it is ${options.join(', ')}` },
+      ],
+      model: 'llama-3.3-70b',
+      response_format: { "type": "json_object" },
+      stream: false,
     };
+
     const chatCompletion: Cerebras.Chat.ChatCompletion = await client.chat.completions.create(params);
     const choices = chatCompletion.choices as Cerebras.Chat.ChatCompletion.ChatCompletionResponse.Choice[];
-    return choices[0].message.content ?? 'No response returned';
+    const content = choices[0].message.content;
+
+    if (!content) {
+      throw new Error('No response content returned');
+    }
+
+    const parsedResponse = JSON.parse(content) as EnhancedPromptResponse;
+
+    // Validate the response has the required properties
+    if (!parsedResponse.enhancePrompt || !Array.isArray(parsedResponse.thingsImprovedInPrompt)) {
+      throw new Error('Invalid response format');
+    }
+
+    return parsedResponse;
+
   } catch (err) {
     if (err instanceof Cerebras.APIError) {
       console.log(`Error: ${err.name} - ${err.message}`);
       if (err.status === 400) {
-        return prompt.trim(); // Return the original prompt if it's invalid
-      } else {
-        throw err;
+        // Return a properly formatted response even for errors
+        return {
+          enhancePrompt: prompt.trim(),
+          thingsImprovedInPrompt: ['No improvements made due to invalid prompt']
+        };
       }
-    } else {
       throw err;
     }
+    throw err;
   }
 }
 
+export type { EnhancedPromptResponse };
 export default enhancePrompt;
